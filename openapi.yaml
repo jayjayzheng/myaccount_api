@@ -1,0 +1,525 @@
+openapi: 3.0.3
+info:
+  title: SCG My Account REST API
+  description: >-
+    This is a live documentation of My Account REST API Design based on the OpenAPI 3.0 specification.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8000/api/v1
+tags:
+  - name: Payments
+    description: >-
+      Payments API provides operations for payments related service including pay my bill function
+  - name: Bill Accounts
+    description: Bill Accounts API provides operations to manage bill accounts
+paths:
+  /payments/initialize:
+    get:
+      tags:
+        - Payments
+      summary: Initialize payment accounts for a user
+      description: >-
+        Fetch user info based on web user identified from session token, then
+        get list of bank & payment accounts, arrearage msg, check across portal
+        accts, validate payment eligibility  rules
+      operationId: initialize
+      responses:
+        200:
+          description: >-
+            Return a list of ba payment info and a list of bank accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Payments initialized successfully
+                  data:
+                    type: object
+                    properties:
+                      baPaymentInfos:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BaPaymentInfo'
+                      bankAccounts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BankAccount'
+
+        400:
+          description: The request was invalid or cannot be otherwise served.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/400BadRequest'
+        401:
+          description: Authentication credentials were missing or incorrect.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/401Unauthorized'
+        403:
+          description: The request is understood, but it has been refused or access is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/403Forbidden'
+        404:
+          description: The URI requested is invalid or the resource requested does not exists. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/404NotFound'
+        409:
+          description: Any message which should help the user to resolve the conflict. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/409Conflict'
+        429:
+          description: The request cannot be served due to the application’s rate limit having been exhausted for the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/429TooManyRequests'
+        500:
+          description: Something is broken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/500InternalServerError'
+        503:
+          description: The server is up, but overloaded with requests. Try again later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - BasicAuth: []
+  /payments/validate:
+    post:
+      tags:
+        - Payments
+      summary: Validate payment accounts
+      description: Validate payment info (duplicate payment with date, payment amount, etc)
+      operationId: validate
+      requestBody:
+        description: >-
+          list of baid & payment amount; single bank account & pay date
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                # payment needs to be a list
+                payments:
+                  type: array
+                  items:
+                    type: object
+                    properties:
+                      baId:
+                        type: string
+                      paymentAmount:
+                        type: string
+                      BankAccountId:
+                        type: string
+                      PayDate:
+                        type: string
+                        format: date
+      responses:
+        200:
+          description: >-
+            Return list of Payment Accounts with success or failed error codes or msg, and any additional global messages
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  data:
+                    type: object
+                    properties:
+                      payments:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            paymentId:
+                              type: string
+                            messages:
+                              $ref: '#/components/schemas/Message'
+        400:
+          description: The request was invalid or cannot be otherwise served. <br/> TBD - treat 400 as functional error?
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/400BadRequest'
+        401:
+          description: Authentication credentials were missing or incorrect.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/401Unauthorized'
+        403:
+          description: The request is understood, but it has been refused or access is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/403Forbidden'
+        404:
+          description: The URI requested is invalid or the resource requested does not exists. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/404NotFound'
+        409:
+          description: Any message which should help the user to resolve the conflict. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/409Conflict'
+        429:
+          description: The request cannot be served due to the application’s rate limit having been exhausted for the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/429TooManyRequests'
+        500:
+          description: Something is broken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/500InternalServerError'
+        503:
+          description: The server is up, but overloaded with requests. Try again later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - BasicAuth: []
+  /payments/submit:
+    get:
+      tags:
+        - Payments
+      summary: Submit payment accounts for a user
+      description: >-
+        Submit payments with payment accounts from session; store (payment id, amount, date) into scope to integrate with Edit & Cancel payment flow
+      operationId: submit
+      responses:
+        200:
+          description: >-
+            Return list of success/fail with error code (with FNP on each payment)
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  reponse_code:
+                    type: string
+                  messages:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Message'
+                  data:
+                    type: object
+                    properties:
+                      payments:
+                        type: array
+                        items:
+                          type: object
+                          properties:
+                            id:
+                              type: string
+                            confirmation_number:
+                              type: string
+                            fnp_status:
+                              type: string
+                            messages:
+                              $ref: '#/components/schemas/Message'
+        400:
+          description: The request was invalid or cannot be otherwise served.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/400BadRequest'
+        401:
+          description: Authentication credentials were missing or incorrect.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/401Unauthorized'
+        403:
+          description: The request is understood, but it has been refused or access is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/403Forbidden'
+        404:
+          description: The URI requested is invalid or the resource requested does not exists. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/404NotFound'
+        409:
+          description: Any message which should help the user to resolve the conflict. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/409Conflict'
+        429:
+          description: The request cannot be served due to the application’s rate limit having been exhausted for the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/429TooManyRequests'
+        500:
+          description: Something is broken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/500InternalServerError'
+        503:
+          description: The server is up, but overloaded with requests. Try again later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/503ServiceUnavailable'
+      security:
+        - BasicAuth: []
+  /billAccounts:
+    get:
+      tags:
+        - Bill Accounts
+      summary: Get a list of bill accounts for an embedded user session
+      description: to be added
+      responses:
+        200:
+          description: Return a list of associated bill accounts
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: Bill Accounts retrieved successfully
+                  data:
+                    type: object
+                    properties:
+                      billAccounts:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/BillAccount'
+        400:
+          description: The request was invalid or cannot be otherwise served.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/400BadRequest'
+        401:
+          description: Authentication credentials were missing or incorrect.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/401Unauthorized'
+        403:
+          description: The request is understood, but it has been refused or access is not allowed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/403Forbidden'
+        404:
+          description: The URI requested is invalid or the resource requested does not exists. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/404NotFound'
+        409:
+          description: Any message which should help the user to resolve the conflict. 
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/409Conflict'
+        429:
+          description: The request cannot be served due to the application’s rate limit having been exhausted for the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/429TooManyRequests'
+        500:
+          description: Something is broken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/500InternalServerError'
+        503:
+          description: The server is up, but overloaded with requests. Try again later.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/responses/503ServiceUnavailable'
+components:
+  schemas:
+    BaPaymentInfo:
+      type: object
+      properties:
+        baId:
+          type: string
+        payEligibility:
+          type: boolean
+          example: true
+        currentBal:
+          type: number
+          format: int64
+          example: 59.5
+        FNP_status:
+          type: string
+          example: valid
+        reasonCode:
+          type: string
+          description: message code
+          example: PAYACCT-300
+        complete:
+          type: boolean
+          example: true
+      required:
+        - baId
+    BillAccount:
+      type: object
+      properties:
+        baId:
+          type: string
+          example: ER234SDEVO54345NSD
+        baNickname:
+          type: string
+          example: residental account
+        role:
+          type: string
+        baStatusCd:
+          type: string
+        paperlessEnable:
+          type: boolean
+        paperlessEligible:
+          type: boolean
+        serviceAddr:
+          $ref: '#/components/schemas/Address'
+    BankAccount:
+      type: object
+      properties:
+        bankAccountId:
+          type: string
+          example: ER234S23423O54345NSD
+        bankNickName:
+          type: string
+          example: My Checking
+    Address:
+      type: object
+      properties:
+        streetAddr:
+          type: string
+        aptNum:
+          type: string
+        city:
+          type: string
+        state:
+          type: string
+        zip:
+          type: string
+    ApiErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        error_code:
+          type: integer
+          format: int32
+          example: 1300
+        message:
+          type: string
+          example: Invalid web user
+        data:
+          type: object
+    Message:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message_code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        data:
+          type: object
+    Error:
+      type: object
+      properties:
+        error_code:
+          type: integer
+          format: int32
+        message:
+          type: string
+        field:
+          type: string
+    Errors:
+      type: array
+      items:
+        $ref: '#/components/schemas/Error'
+    ValidationError:
+      type: object
+      properties:
+        message:
+          type: string
+        errors:
+          $ref: '#/components/schemas/Errors'
+  # define reusable response components:
+  responses:
+    SuccessMessage:
+      $ref: '#/components/schemas/Message'
+    400BadRequest:
+      $ref: '#/components/schemas/ValidationError'
+    401Unauthorized:
+      $ref: '#/components/schemas/Message'
+    403Forbidden:
+      $ref: '#/components/schemas/Message'
+    404NotFound:
+      $ref: '#/components/schemas/Message'
+    409Conflict:
+      $ref: '#/components/schemas/Message'
+    429TooManyRequests:        
+      $ref: '#/components/schemas/Message'
+    500InternalServerError:
+      $ref: '#/components/schemas/Message'
+    503ServiceUnavailable:
+      $ref: '#/components/schemas/Message'
+  # Ending define reusable response components   
+  securitySchemes:
+    BasicAuth:
+      type: http
+      scheme: basic
+    BearerAuth:
+      type: http
+      scheme: bearer
+    api_key:
+      type: apiKey
+      name: api_key
+      in: header
