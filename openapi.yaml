@@ -156,6 +156,8 @@ paths:
                           properties:
                             paymentId:
                               type: string
+                            baId:
+                              type: string
                             messages:
                               $ref: '#/components/schemas/Message'
         400:
